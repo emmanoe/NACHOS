@@ -10,4 +10,6 @@ Delar Emmanoe
 
 # Description :
 
-L’objectif de ce devoir est de mettre en place en Nachos quelques appels systèmes de base.
+(1) L’objectif de ce devoir est de mettre en place en Nachos quelques appels systèmes de base.  
+(2) L'objectif de ce devoir est de permettre d’exécuter des applications multi-threads sous Nachos.  
+(3) L'objectif de ce devoir est de constituer un pas de plus vers la réalisation en Nachos d’un modèle de processus à la manière d’Unix.

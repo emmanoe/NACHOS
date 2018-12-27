@@ -1,9 +1,9 @@
-// addrspace.cc 
+// addrspace.cc
 //      Routines to manage address spaces (executing user programs).
 //
 //      In order to run a user program, you must:
 //
-//      1. link with the -N -T 0 option 
+//      1. link with the -N -T 0 option
 //      2. run coff2noff to convert the object file to Nachos format
 //              (Nachos object code format is essentially just a simpler
 //              version of the UNIX executable object code format)
@@ -12,7 +12,7 @@
 //              don't need to do this last step)
 //
 // Copyright (c) 1992-1993 The Regents of the University of California.
-// All rights reserved.  See copyright.h for copyright notice and limitation 
+// All rights reserved.  See copyright.h for copyright notice and limitation
 // of liability and disclaimer of warranty provisions.
 
 #include "copyright.h"
@@ -20,11 +20,38 @@
 #include "addrspace.h"
 #include "noff.h"
 #include "syscall.h"
+#ifdef CHANGED
+#include "synch.h"
+#include "bitmap.h"
+#endif
 #include "new"
+
+#ifdef CHANGED 
+static void ReadAtVirtual(OpenFile *executable, int virtualaddr, int numBytes, int position,
+TranslationEntry *pageTable, unsigned int numPages) {
+
+    char *buffer = new char[numBytes];
+    int nb_read_bytes = executable->ReadAt(buffer, numBytes, position);
+
+    TranslationEntry *saved_pageTable = machine->pageTable;
+    int saved_pageTableSize = machine->pageTableSize;
+
+    machine->pageTable = pageTable;
+    machine->pageTableSize = numPages;
+
+    for (int i = 0; i < nb_read_bytes; i++) {
+        machine->WriteMem(virtualaddr + i, 1, buffer[i]);
+    }
+
+    machine->pageTable = saved_pageTable;
+    machine->pageTableSize = saved_pageTableSize;
+}
+#endif
+
 
 //----------------------------------------------------------------------
 // SwapHeader
-//      Do little endian to big endian conversion on the bytes in the 
+//      Do little endian to big endian conversion on the bytes in the
 //      object file header, in case the file was generated on a little
 //      endian machine, and we're now running on a big endian machine.
 //----------------------------------------------------------------------
@@ -53,7 +80,7 @@ SwapHeader (NoffHeader * noffH)
 //
 //      Assumes that the object code file is in NOFF format.
 //
-//      First, set up the translation from program memory to physical 
+//      First, set up the translation from program memory to physical
 //      memory.  For now, this is really simple (1:1), since we are
 //      only uniprogramming, and we have a single unsegmented page table
 //
@@ -62,6 +89,13 @@ SwapHeader (NoffHeader * noffH)
 
 AddrSpace::AddrSpace (OpenFile * executable)
 {
+    #ifdef CHANGED
+    int bmp_size = UserStacksAreaSize / PageSize + 1;
+    currentBitMap = new BitMap(bmp_size);
+    currentBitMap->Mark(0);
+    mutex_bitmap = new Semaphore("mutex_bitmap", 1);
+    mutex_cpt_thread = new Semaphore("mutex_cpt_thread", 1);
+    #endif
     NoffHeader noffH;
     unsigned int i, size;
 
@@ -87,41 +121,47 @@ AddrSpace::AddrSpace (OpenFile * executable)
 
     DEBUG ('a', "Initializing address space, num pages %d, total size 0x%x\n",
 	   numPages, size);
-// first, set up the translation 
+// first, set up the translation
     pageTable = new TranslationEntry[numPages];
     for (i = 0; i < numPages; i++)
       {
-	  pageTable[i].physicalPage = i;	// for now, phys page # = virtual page #
-	  pageTable[i].valid = TRUE;
+      #ifdef CHANGED
+      int ind = machine->pageprovider->GetEmptyPage();
+      //printf("EmptyPage = %d\n",ind);
+      pageTable[i].physicalPage = ind;//	// for now, phys page # = virtual page # + 1
+      #endif
+      pageTable[i].valid = TRUE;
 	  pageTable[i].use = FALSE;
 	  pageTable[i].dirty = FALSE;
-	  pageTable[i].readOnly = FALSE;	// if the code segment was entirely on 
-	  // a separate page, we could set its 
+	  pageTable[i].readOnly = FALSE;	// if the code segment was entirely on
+	  // a separate page, we could set its
 	  // pages to be read-only
       }
 
 // then, copy in the code and data segments into memory
     if (noffH.code.size > 0)
       {
-	  DEBUG ('a', "Initializing code segment, at 0x%x, size 0x%x\n",
-		 noffH.code.virtualAddr, noffH.code.size);
-	  executable->ReadAt (&(machine->mainMemory[noffH.code.virtualAddr]),
-			      noffH.code.size, noffH.code.inFileAddr);
+	    DEBUG ('a', "Initializing code segment, at 0x%x, size 0x%x\n",
+		    noffH.code.virtualAddr, noffH.code.size);
+	    ReadAtVirtual(executable, noffH.code.virtualAddr, 
+            noffH.code.size, noffH.code.inFileAddr, pageTable, numPages);
+
       }
     if (noffH.initData.size > 0)
       {
-	  DEBUG ('a', "Initializing data segment, at 0x%x, size 0x%x\n",
-		 noffH.initData.virtualAddr, noffH.initData.size);
-	  executable->ReadAt (&
-			      (machine->mainMemory
-			       [noffH.initData.virtualAddr]),
-			      noffH.initData.size, noffH.initData.inFileAddr);
+	    DEBUG ('a', "Initializing data segment, at 0x%x, size 0x%x\n",
+		    noffH.initData.virtualAddr, noffH.initData.size);
+        ReadAtVirtual(executable, noffH.initData.virtualAddr, 
+            noffH.initData.size, noffH.initData.inFileAddr, pageTable, numPages);
       }
 
     DEBUG ('a', "Area for stacks at 0x%x, size 0x%x\n",
 	   size - UserStacksAreaSize, UserStacksAreaSize);
 
     pageTable[0].valid = FALSE;			// Catch NULL dereference
+    #ifdef CHANGED
+    //page =machine->pageprovider->GetEmptyPage();
+    #endif
 }
 
 //----------------------------------------------------------------------
@@ -135,6 +175,12 @@ AddrSpace::~AddrSpace ()
   // delete pageTable;
   delete [] pageTable;
   // End of modification
+   #ifdef CHANGED
+        for (unsigned int i=0; i< numPages; i++){
+            machine->pageprovider->ReleasePage(pageTable[i].physicalPage);
+        }   
+    //machine->pageprovider->ReleasePage(page);
+    #endif
 }
 
 //----------------------------------------------------------------------
@@ -197,3 +243,23 @@ AddrSpace::RestoreState ()
     machine->pageTable = pageTable;
     machine->pageTableSize = numPages;
 }
+
+#ifdef CHANGED
+//-----------------------------------------------------------------------
+//Initialize stack Pointer,
+//@return int address of new stack top address
+//-----------------------------------------------------------------------
+int 
+AddrSpace::AllocateUserStack(int cptThread) 
+{
+    int sizeVirtualMemory = numPages * PageSize;
+    // Calcul the user stack register (but subtract off a bit).
+    return (sizeVirtualMemory - (cptThread * 256)) - 16;
+}
+
+int
+AddrSpace::BitMapFind()
+{
+    return currentBitMap->Find();
+}
+#endif

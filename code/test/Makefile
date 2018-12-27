@@ -17,18 +17,18 @@ NACHOS_ARCH := $(shell $(NACHOS_ROOT)/bin/nachos_arch)
 ifeq ($(NACHOS_SYS),SOLARIS_SYS)
 # Solaris/PC
 ifeq ($(NACHOS_ARCH),X86_ARCH)
-GCCDIR	= /net/cremi/aguermou/xgcc/decstation-ultrix/bin
+GCCDIR	= /opt/xgcc/decstation-ultrix/bin
 endif
 # Solaris/Sparc
 ifeq ($(NACHOS_ARCH),SPARC_ARCH)
-GCCDIR	= /net/cremi/aguermou/xgcc/decstation-ultrix/bin
+GCCDIR	= /opt/xgcc/decstation-ultrix/bin
 endif
 endif
 
 ifeq ($(NACHOS_SYS),LINUX_SYS)
 # Linux: fill in with the full path to the binutils and gcc.
 # For instance:
-GCCDIR	= /net/cremi/aguermou/xgcc/decstation-ultrix/bin
+GCCDIR	= /opt/xgcc/decstation-ultrix/bin
 endif
 
 ifeq ($(NACHOS_SYS),MAC_OS_SYS)
@@ -48,12 +48,12 @@ CPPFLAGS = $(INCDIR) -DCHANGED
 # CPPFLAGS = -P $(INCDIR)
 
 
-CC	:=	$(GCCDIR)/gcc
+CC	:=	$(GCCDIR)/xgcc
 AS	:=	$(GCCDIR)/as
 LD	:=	$(GCCDIR)/ld
 OBJDUMP	:=	$(GCCDIR)/objdump
 
-CPP	:=	$(GCCDIR)/gcc -E -P
+CPP	:=	$(GCCDIR)/xgcc -E -P
 INCDIR	:=	-I../userprog -I../threads
 CFLAGS 	:=	-DIN_USER_MODE -c $(INCDIR) -G 0 -Wall -O2 -DCHANGED
 

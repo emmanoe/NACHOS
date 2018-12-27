@@ -1,5 +1,5 @@
-// addrspace.h 
-//      Data structures to keep track of executing user programs 
+// addrspace.h
+//      Data structures to keep track of executing user programs
 //      (address spaces).
 //
 //      For now, we don't keep any information about address spaces.
@@ -7,7 +7,7 @@
 //      executing the user program (see thread.h).
 //
 // Copyright (c) 1992-1993 The Regents of the University of California.
-// All rights reserved.  See copyright.h for copyright notice and limitation 
+// All rights reserved.  See copyright.h for copyright notice and limitation
 // of liability and disclaimer of warranty provisions.
 
 #ifndef ADDRSPACE_H
@@ -17,11 +17,23 @@
 #include "filesys.h"
 #include "translate.h"
 
+#ifdef CHANGED
+#include "bitmap.h"
+class Semaphore;
+#endif
+
 #define UserStacksAreaSize		1024	// increase this as necessary!
 
 class AddrSpace:dontcopythis
 {
   public:
+    #ifdef CHANGED
+      int AllocateUserStack(int cptThread);
+      int BitMapFind();
+      BitMap *currentBitMap;
+      Semaphore *mutex_bitmap;
+      Semaphore *mutex_cpt_thread;
+    #endif
     AddrSpace (OpenFile * executable);	// Create an address space,
     // initializing it with the program
     // stored in the file "executable"
@@ -31,13 +43,16 @@ class AddrSpace:dontcopythis
     // before jumping to user code
 
     void SaveState ();		// Save/restore address space-specific
-    void RestoreState ();	// info on a context switch 
+    void RestoreState ();	// info on a context switch
 
   private:
       TranslationEntry * pageTable;	// Assume linear page table translation
     // for now!
-    unsigned int numPages;	// Number of pages in the virtual 
+    unsigned int numPages;	// Number of pages in the virtual
     // address space
+    #ifdef CHANGED
+    int page;
+    #endif
 };
 
 #endif // ADDRSPACE_H

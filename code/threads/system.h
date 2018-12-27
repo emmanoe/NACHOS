@@ -16,6 +16,7 @@
 #include "stats.h"
 #include "timer.h"
 
+
 // Initialization and cleanup routines
 extern void Initialize (int argc, char **argv);	// Initialization,
 						// called before anything else
@@ -32,6 +33,13 @@ extern Timer *timer;		// the hardware alarm clock
 #ifdef USER_PROGRAM
 #include "machine.h"
 extern Machine *machine;	// user program memory and registers
+#ifdef CHANGED
+const unsigned int MAX_STRING_SIZE = 10;
+#include "synchconsole.h"
+extern SynchConsole *synchconsole;
+int copyStringFromMachine(int from, char *to, unsigned int size);
+int copyStringToMachine(char *from, int to, unsigned int size);
+#endif
 #endif
 
 #ifdef FILESYS_NEEDED		// FILESYS or FILESYS_STUB
